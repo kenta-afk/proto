@@ -12,29 +12,38 @@ use crate::models::auth::{TokenResponse, AuthConfig};
 
 /// 認可フロー用ルートをまとめて返す
 pub fn auth_routes(config: AuthConfig) -> Router {
-    let login_config = config.clone();
-    let callback_config = config.clone();
+    let config = Arc::new(config);
     Router::new()
-        .route("/login", get(move || login_handler(login_config)))
-        .route("/callback", get(move |query| callback_handler(query, callback_config)))
+        .route("/login", 
+            get({
+                let config = config.clone();
+                move || login_handler(config)
+            }),
+        )
+        .route("/callback", 
+            get({
+                let callback_config = config.clone();
+                move |query| callback_handler(query, config)
+            }),
+        )
 }
 
-/// `/login` ハンドラー: Backlog 認可エンドポイントへリダイレクト
-async fn login_handler(config: AuthConfig) -> Redirect {
-    let encoded_redirect = urlencoding::encode(&config.redirect_uri);
+// / `/login` ハンドラー: 認可コードを取得するためのリダイレクトを行う。
+async fn login_handler(config: Arc<AuthConfig>) -> Redirect {
+    let encoded_redirect_url = urlencoding::encode(&config.redirect_uri);
 
     let url = format!(
         "https://{}.backlog.jp/OAuth2AccessRequest.action?response_type=code&client_id={}&redirect_uri={}&state=xyz",
-        config.backlog_space, config.client_id, encoded_redirect,
+        config.backlog_space, config.client_id, encoded_redirect_url,
     );
 
     Redirect::to(&url)
 }
 
-/// `/callback` ハンドラー: 認可コード受け取り→トークン交換
+/// `/callback` ハンドラー: 認可コード受け取り→トークン取得する。
 async fn callback_handler(
     Query(params): Query<HashMap<String, String>>,
-    config: AuthConfig,
+    config: Arc<AuthConfig>,
 ) -> Result<String, (StatusCode, String)> {
     let code = if let Some(code) = params.get("code") {
         code.clone()
