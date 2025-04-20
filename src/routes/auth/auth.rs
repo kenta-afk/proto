@@ -10,27 +10,30 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::models::auth::{TokenResponse, AuthConfig};
+use crate::utils::backlog::get_authenticated_user_info;
 
-/// 認可フロー用ルートをまとめて返す
+/// auth routes
+/// 認証関連のルーティングを定義する。
 pub fn auth_routes(config: AuthConfig) -> Router {
     let config = Arc::new(config);
     Router::new()
         .route("/login", 
             get({
                 let config = config.clone();
-                move || login_handler(config)
+                move || login(config)
             }),
         )
         .route("/callback", 
             get({
                 let config = config.clone();
-                move |query| callback_handler(query, config)
+                move |query| callback(query, config)
             }),
         )
 }
 
-// / `/login` ハンドラー: 認可コードを取得するためのリダイレクトを行う。
-async fn login_handler(config: Arc<AuthConfig>) -> Redirect {
+/// `/login` ハンドラー: 認可コードを取得するためのリダイレクトを行う。
+/// get code from Backlog
+async fn login(config: Arc<AuthConfig>) -> Redirect {
     let encoded_redirect_url = urlencoding::encode(&config.redirect_uri);
 
     let url = format!(
@@ -41,16 +44,18 @@ async fn login_handler(config: Arc<AuthConfig>) -> Redirect {
     Redirect::to(&url)
 }
 
-/// `/callback` ハンドラー: 認可コード受け取り→アクセストークンを取得する。
-async fn callback_handler(
+/// `/callback` ハンドラー: 認可コード受け取り→アクセストークンを取得し、ユーザー情報を返す。
+/// get access token and user info from Backlog
+async fn callback(
     Query(params): Query<HashMap<String, String>>,
     config: Arc<AuthConfig>,
 ) -> Result<String, (StatusCode, String)> {
-    let code = if let Some(code) = params.get("code") {
-        code.clone()
-    } else {
-        return Err((StatusCode::BAD_REQUEST, "認可コード(code)がクエリに含まれていません".into()));
-    };
+    let code = params.get("code").cloned().ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "認可コード(code)がクエリに含まれていません".into(),
+        )
+    })?;
 
     let client = Client::new();
     let resp = client
@@ -69,9 +74,12 @@ async fn callback_handler(
         .send()
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
+    
     let status = resp.status();
-    let text = resp.text().await.map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
     if !status.is_success() {
         return Err((
@@ -80,11 +88,23 @@ async fn callback_handler(
         ));
     }
 
-    match serde_json::from_str::<TokenResponse>(&text) {
-        Ok(token) => Ok(format!("トークン取得成功: {:#?}", token)),
-        Err(e) => Err((
+    let token: TokenResponse = serde_json::from_str(&text).map_err(|e| {
+        (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("トークンのパースに失敗: {}。受信データ: {}", e, text),
-        )),
-    }
+        )
+    })?;
+
+    // アクセストークンを使用してユーザー情報を取得
+    let user_info = get_authenticated_user_info(&client, &token.access_token, &config.backlog_space)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(format!("ユーザー情報取得成功: {:#?}", user_info))
 }
+
+
+
+
+
+

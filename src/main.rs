@@ -1,5 +1,6 @@
 mod routes;
 mod models;
+mod utils;
 mod env;
 
 use axum::{
