@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use bytes::Bytes;
 
 // TokenResponse Structure
 #[derive(Debug, Serialize, Deserialize)]
@@ -19,7 +20,7 @@ pub struct AuthConfig {
 }
 
 // User Structure
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: u64,
@@ -33,9 +34,23 @@ pub struct User {
 }
 
 // NulabAccount Structure
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct NulabAccount {
     nulabId: String,
     name: String,
     uniqueId: String,
+}
+
+/// ユーザーアイコンの情報を保持する構造体
+#[derive(Debug)]
+pub struct UserIcon {
+    pub content_type: String,
+    pub content_disposition: String,
+    pub data: Bytes,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserWithIcon {
+    pub user: User,
+    pub icon_base64: Option<String>,
 }
