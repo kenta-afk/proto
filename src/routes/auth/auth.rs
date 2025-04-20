@@ -11,7 +11,7 @@ use std::sync::Arc;
 use base64::Engine;
 
 use crate::models::auth::{TokenResponse, AuthConfig, UserIcon, UserWithIcon};
-use crate::utils::getUserInfo::get_authenticated_user;
+use crate::utils::getUser::get_authenticated_user;
 use crate::utils::getUserIcon::get_user_icon;
 
 pub fn auth_routes(config: AuthConfig) -> Router {
