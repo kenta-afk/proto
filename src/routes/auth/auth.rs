@@ -7,6 +7,7 @@ use axum::{
 };
 use reqwest::Client;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::models::auth::{TokenResponse, AuthConfig};
 
@@ -22,7 +23,7 @@ pub fn auth_routes(config: AuthConfig) -> Router {
         )
         .route("/callback", 
             get({
-                let callback_config = config.clone();
+                let config = config.clone();
                 move |query| callback_handler(query, config)
             }),
         )
@@ -40,7 +41,7 @@ async fn login_handler(config: Arc<AuthConfig>) -> Redirect {
     Redirect::to(&url)
 }
 
-/// `/callback` ハンドラー: 認可コード受け取り→トークン取得する。
+/// `/callback` ハンドラー: 認可コード受け取り→アクセストークンを取得する。
 async fn callback_handler(
     Query(params): Query<HashMap<String, String>>,
     config: Arc<AuthConfig>,
