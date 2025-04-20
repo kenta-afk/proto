@@ -2,7 +2,7 @@ use reqwest::Client;
 use crate::models::auth::User;
 
 // This function retrieves the authenticated user's information from Backlog using the provided access token.
-pub async fn get_authenticated_user_info(
+pub async fn get_authenticated_user(
     client: &Client,
     access_token: &str,
     space: &str,
