@@ -92,7 +92,7 @@ async fn callback(
     })?;
     
     // ユーザー情報の取得
-    let user_info = get_authenticated_user_info(&client, &token.access_token, &config.backlog_space)
+    let user_info = get_authenticated_user(&client, &token.access_token, &config.backlog_space)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     

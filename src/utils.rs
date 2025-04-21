@@ -1,2 +1,2 @@
-pub mod getUserInfo;
+pub mod getUser;
 pub mod getUserIcon;
